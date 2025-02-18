@@ -76,7 +76,10 @@ class WhatsAppNotification(Document):
             fieldname='*'
         )
 
-        if template:
+        print ('field name ', self.field_name)
+        print ('docdata ', doc_data[self.field_name])
+        #FIX 16-02-2025
+        if template and doc_data[self.field_name] != None:
             data = {
                 "messaging_product": "whatsapp",
                 "to": self.format_number(doc_data[self.field_name]),
