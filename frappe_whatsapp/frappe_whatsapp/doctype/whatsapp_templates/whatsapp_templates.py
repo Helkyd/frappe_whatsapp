@@ -252,10 +252,24 @@ def fetch():
                 # update template text
                 elif component["type"] == "BODY":
                     doc.template = component["text"]
-                    if component.get("example"):
-                        doc.sample_values = ",".join(
-                            component["example"]["body_text"][0]
-                        )
+                    print ('doc template ', doc.template)
+                    print ('**************')
+                    print (component)
+                    print ('EXXAAAAAAAAAA')
+                    if "example" in component:
+                        print (component["example"])
+                        if "body_text_named_params" in component["example"]:
+                            print (component["example"]["body_text_named_params"][0]["example"])
+                            #FIX 23-02-2025; Not using body_text
+                            if component.get("example"):
+                                if "body_text" in component["example"]:
+                                    doc.sample_values = ",".join(
+                                        component["example"]["body_text"][0]
+                                    )
+                                else:
+                                    doc.sample_values = ",".join(
+                                        component["example"]["body_text_named_params"][0]["example"]
+                                    )
 
             # if document exists update else insert
             # used db_update and db_insert to ignore hooks

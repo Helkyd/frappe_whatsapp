@@ -41,6 +41,8 @@ class WhatsAppNotification(Document):
             fieldname='actual_name'
         )
         if language_code:
+            print ('CONTACT LIST')
+            print (self._contact_list)
             for contact in self._contact_list:
                 data = {
                     "messaging_product": "whatsapp",
@@ -249,6 +251,8 @@ class WhatsAppNotification(Document):
         pais_origem = frappe.get_value("Company",listaempresas[0],"country")
         if pais_origem.upper() == "ANGOLA":
             indicativo = "+244"
+
+        print ('Number ', number)
 
         if (number.startswith("+")):
             number = number[1:len(number)]
