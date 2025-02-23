@@ -243,8 +243,17 @@ class WhatsAppNotification(Document):
 
     def format_number(self, number):
         """Format number."""
+        #FIX HELKYDS 23-02-2025; Get App Courntry and add +244 if Angola
+        indicativo = ""
+        listaempresas = frappe.get_list("Company", fields=["name", "country"], ignore_permissions=True)
+        pais_origem = frappe.get_value("Company",listaempresas[0],"country")
+        if pais_origem.upper() == "ANGOLA":
+            indicativo = "+244"
+
         if (number.startswith("+")):
             number = number[1:len(number)]
+        elif indicativo:
+            number = "244" + str(number)
 
         return number
 
