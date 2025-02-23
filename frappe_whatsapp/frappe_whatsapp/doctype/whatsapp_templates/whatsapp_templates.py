@@ -75,6 +75,10 @@ class WhatsAppTemplates(Document):
 
 
     def after_insert(self):
+        #FIX 23-02-2025
+        import re
+        regex = r"\{\{([^}]+)\}\}"
+
         if self.template_name:
             self.actual_name = self.template_name.lower().replace(" ", "_")
 
@@ -91,19 +95,26 @@ class WhatsAppTemplates(Document):
             "text": self.template,
         }
         if self.sample_values:
-            body.update({"example": {"body_text": [self.sample_values.split(",")]}})
+            #body.update({"example": {"body_text": [self.sample_values.split(",")]}})
 
-        '''
-        {'components': [{'type': 'BODY', 'text': 'Caro Cliente {{customer_name}},\n\nEm anexo a Factura de Venda referente ao periodo...\n\nRgrds,
-        \n\nAngolaERP / MetaGest', 'example': {'body_text': [['CLIENTES']]}}, {'type': 'header', 'format': 'TEXT', 'text': 'Factura de Venda: {{doc_agt}}'}]}
-        '''
+            test_str = self.template
 
-        '''
-        {'name': 'enviarfacturas_v1', 'language': 'pt_PT', 'category': 'MARKETING', 
-        'components': [{'type': 'BODY', 'text': 'Caro Cliente {{customer_name}},\n\n
-        Em anexo a Factura de Venda referente ao periodo...\n\nRgrds,\n\nAngolaERP / MetaGest', 'example': {'body_text': [['NOME DO CLIENTE']]}}, 
-        {'type': 'header', 'format': 'TEXT', 'text': 'Factura de Venda: {{doc_agt}}'}]}
-        '''
+            matches = re.finditer(regex, test_str, re.MULTILINE)
+            match = None
+            for matchNum, match in enumerate(matches, start=1):
+                print ("Match {matchNum} was found at {start}-{end}: {match}".format(matchNum = matchNum, start = match.start(), end = match.end(), match = match.group()))
+                match = match.group()
+
+            print ('sample values')
+            print (self.sample_values)
+            print (str(self.sample_values))
+
+            body.update({"example": {
+                "body_text_named_params": [{
+                    'param_name': match,
+                    'example': str(self.sample_values)
+                }]
+            }})
 
         data["components"].append(body)
         if self.header_type:
