@@ -79,7 +79,11 @@ class WhatsAppNotification(Document):
         )
 
         print ('field name ', self.field_name)
-        print ('docdata ', doc_data[self.field_name])
+        print ('docdata field_name', doc_data[self.field_name])
+        print ('DATA DOC ***********')
+        print (doc_data)
+        print ('sefl fields')
+        print (self.fields)
         #FIX 16-02-2025
         if template and doc_data[self.field_name] != None:
             data = {

@@ -103,6 +103,9 @@ class WhatsAppMessage(Document):
                 "parameters": header_parameters,
             })
 
+        #FIX 23-02-2025
+        print ('WHATS MESSAGE DATAAAAAAAAAAAAAA')
+        print (data)
         self.notify(data)
 
     def notify(self, data):
