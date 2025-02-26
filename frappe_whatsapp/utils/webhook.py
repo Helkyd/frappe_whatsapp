@@ -48,7 +48,7 @@ def post():
 			message_type = message['type']
 			is_reply = True if message.get('context') else False
 			#FIX 26-02-2025
-			if "forwarded" in message.get('context'):
+			if message.get('context') and "forwarded" in message.get('context'):
 				is_reply = False
 				reply_to_message_id = None
 			else:
