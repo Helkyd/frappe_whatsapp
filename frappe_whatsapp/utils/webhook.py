@@ -6,6 +6,7 @@ import time
 from werkzeug.wrappers import Response
 import frappe.utils
 
+#HELKYDS Last Modified: 26-02-2025
 
 @frappe.whitelist(allow_guest=True)
 def webhook():
@@ -46,7 +47,12 @@ def post():
 		for message in messages:
 			message_type = message['type']
 			is_reply = True if message.get('context') else False
-			reply_to_message_id = message['context']['id'] if is_reply else None
+			#FIX 26-02-2025
+			if "forwarded" in message.get('context'):
+				is_reply = False
+				reply_to_message_id = None
+			else:
+				reply_to_message_id = message['context']['id'] if is_reply else None
 			if message_type == 'text':
 				frappe.get_doc({
 					"doctype": "WhatsApp Message",
