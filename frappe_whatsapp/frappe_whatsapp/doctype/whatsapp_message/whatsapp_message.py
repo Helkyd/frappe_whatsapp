@@ -17,6 +17,7 @@ import base64
 from frappe.utils import now
 import time
 from frappe import enqueue
+import os   #FIX 27-02-2025
 
 
 class WhatsAppMessage(Document):
@@ -166,12 +167,17 @@ class WhatsAppMessage(Document):
     # to send whatsapp message and document using ultramsg
     #to create pdf
     def create_pdf(self,doc):
+        print ('create PDF .....')
+        print ('doctype ', doc.doctype)
+        print (doc.name)
+        print ('print format ')
+        print (self.print_format)
         file = frappe.get_print(doc.doctype, doc.name, self.print_format, as_pdf=True)
         pdf_bytes = io.BytesIO(file)
         pdf_base64 = base64.b64encode(pdf_bytes.getvalue()).decode()
         in_memory_url = f"data:application/pdf;base64,{pdf_base64}"
         return in_memory_url
-    
+
         
     # fetch pdf from the create_pdf function and send to whatsapp 
     @frappe.whitelist()
@@ -349,3 +355,52 @@ def send_template(to, reference_doctype, reference_name, template):
         doc.save()
     except Exception as e:
         raise e
+
+
+#AngolaERP Version of send with PDF
+    
+# fetch pdf from the create_pdf function and send to whatsapp 
+@frappe.whitelist()
+def send_whatsapp_with_pdf_v1(doc,recipients):
+	import json
+	print ('send_whatsapp_with_pdf_v1')
+
+	print (type(doc))
+	print ('doc ', doc)
+	#print (doc.doctype)
+	doc1 = json.loads(doc)
+	print (doc1['doc_agt'])
+    
+	#memory_url= whazapp.create_pdf(doc=doc)
+	whazapp = WhatsAppMessage(doc1['doctype'],doc1['name'])
+	print ('passsssss')
+	from types import SimpleNamespace
+	obj = SimpleNamespace(**doc1)
+	#memory_url= whazapp.create_pdf(doc=obj)
+	#print ('memmory url ', memory_url)
+	print ('OBJSSSS ', obj.doc_agt)
+	#nome_docagt = frappe.get_site_path('public','files') + "/" + doc['doc_agt'].replace(' ','/').replace('/','-') + ".pdf" # doc1['doc_agt']
+	nome_docagt = frappe.get_site_path('public','files') + "/" + obj.doc_agt.replace(' ','/').replace('/','-') + ".pdf" # doc1['doc_agt']
+	print (nome_docagt)
+	if os.path.isfile(nome_docagt):
+		print ('ficheiro exist.........')
+
+    #token = frappe.get_doc('whatsapp message').get('token')
+    #msg1 = frappe.render_template(self.message, context)
+	if not recipients:
+		recipients = whazapp.get_receiver_list(doc=obj,context="TESTE WHATSAPP")
+    
+	multiple_numbers=[] 
+	for receipt in recipients:
+		number = receipt
+		multiple_numbers.append(number)
+	add_multiple_numbers_to_url=','.join(multiple_numbers)
+	#document_url= frappe.get_doc('whatsapp message').get('url')
+	payload = {
+		'recipient': {'id': add_multiple_numbers_to_url},
+		"filename": obj.name,
+		"message": "ENVIO DO PDF....",
+	}
+	whazapp.notify(data=payload)
+    
+    
