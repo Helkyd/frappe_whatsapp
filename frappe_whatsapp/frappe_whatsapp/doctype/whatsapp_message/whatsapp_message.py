@@ -384,6 +384,7 @@ def send_whatsapp_with_pdf_v1(doc,recipients):
 	print (nome_docagt)
 	if os.path.isfile(nome_docagt):
 		print ('ficheiro exist.........')
+        
 
     #token = frappe.get_doc('whatsapp message').get('token')
     #msg1 = frappe.render_template(self.message, context)
