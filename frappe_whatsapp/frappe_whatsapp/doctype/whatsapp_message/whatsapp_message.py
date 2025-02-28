@@ -407,7 +407,8 @@ def send_whatsapp_with_pdf_v1(doc,recipients):
 	add_multiple_numbers_to_url=','.join(multiple_numbers)
 	#document_url= frappe.get_doc('whatsapp message').get('url')
 	if nome_docagt and not nome_docagt.startswith("http"):
-		link = frappe.utils.get_url() + '/files' + nome_docagt[nome_docagt.rfind('/'):]
+		#Remove port from url
+		link = frappe.utils.get_url().replace(":443","") + '/files' + nome_docagt[nome_docagt.rfind('/'):]
 	else:
 		link = nome_docagt
     
