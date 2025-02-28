@@ -25,7 +25,10 @@ class WhatsAppMessage(Document):
 
     def before_insert(self):
         """Send message."""
+        print ('RUIN BEFORE INSERRTTTTTTTTTTTTTTT')
         if self.type == "Outgoing" and self.message_type != "Template":
+            print ('ANEXXXXXXX')
+            print (self.attach)
             if self.attach and not self.attach.startswith("http"):
                 link = frappe.utils.get_url() + "/" + self.attach
             else:
@@ -55,16 +58,22 @@ class WhatsAppMessage(Document):
                 data["text"] = {"link": link}
 
             try:
+                print ('FAZ NOTIFY COM A DATA')
+                print (data)
                 self.notify(data)
                 self.status = "Success"
             except Exception as e:
                 self.status = "Failed"
                 frappe.throw(f"Failed to send message {str(e)}")
         elif self.type == "Outgoing" and self.message_type == "Template" and not self.message_id:
+            print ('BEFORE CALLING SEND TEMPLATE')
+            print ('data')
+            print (data)
             self.send_template()
 
     def send_template(self):
         """Send template."""
+        print ('RUN SEND TEMPLATE...')
         template = frappe.get_doc("WhatsApp Templates", self.template)
         data = {
             "messaging_product": "whatsapp",
@@ -397,11 +406,81 @@ def send_whatsapp_with_pdf_v1(doc,recipients):
 		multiple_numbers.append(number)
 	add_multiple_numbers_to_url=','.join(multiple_numbers)
 	#document_url= frappe.get_doc('whatsapp message').get('url')
+	if nome_docagt and not nome_docagt.startswith("http"):
+		link = frappe.utils.get_url() + '/files' + nome_docagt[nome_docagt.rfind('/'):]
+	else:
+		link = nome_docagt
+    
 	payload = {
-		'recipient': {'id': add_multiple_numbers_to_url},
-		"filename": obj.name,
-		"message": "ENVIO DO PDF....",
+        'messaging_product': 'whatsapp', 
+        'to': recipients, 
+        'type': 'document', 
+        'document': {
+            'link': link, #'https://tl.angolaerp.co.ao/files/PP-25-2337bb43.pdf', 
+            'caption': 'Factura de Venda: {0}'.format(doc1['doc_agt']) 
+        }
+    }    
+	request_body = {
+        "messaging_product": "whatsapp",
+        "to": whazapp.format_number(recipients),
+		"message": {
+			"attachment": {
+				"type": "template",
+				"payload": {
+						"template_type": "generic",
+						"elements": [
+							{
+								"title": "Welcome!",
+								"image_url": "https://raw.githubusercontent.com/fbsamples/original-coast-clothing/main/public/styles/male-work.jpg",
+								"subtitle": "We have the right hat for everyone.",
+								"default_action": {
+									"type": "web_url",
+									"url": "https://www.originalcoastclothing.com/",
+									"webview_height_ratio": "tall",
+								},
+								"buttons": [
+									{
+										"type": "web_url",
+										"url": "https://www.originalcoastclothing.com/",
+										"title": "View Website"
+									}, {
+										"type": "postback",
+										"title": "Start Chatting",
+										"payload": "DEVELOPER_DEFINED_PAYLOAD"
+									}
+								]
+							},
+							{
+								"title": "Welcome!",
+								"image_url": "https://raw.githubusercontent.com/fbsamples/original-coast-clothing/main/public/styles/male-work.jpg",
+								"subtitle": "We have the right hat for everyone.",
+								"default_action": {
+									"type": "web_url",
+									"url": "https://www.originalcoastclothing.com/",
+									"webview_height_ratio": "tall",
+								},
+								"buttons": [
+									{
+										"type": "web_url",
+										"url": "https://www.originalcoastclothing.com/",
+										"title": "View Website"
+									}, {
+										"type": "postback",
+										"title": "Start Chatting",
+										"payload": "DEVELOPER_DEFINED_PAYLOAD"
+									}
+								]
+							}
+						]
+				}
+			}
+		}
 	}
+    
+	print ('REQUEST BODY ********************')
+	print (request_body)
+	print ('PAYLOADdddd')
+	print (payload)
+
+
 	whazapp.notify(data=payload)
-    
-    
