@@ -1,5 +1,8 @@
 # Copyright (c) 2022, Shridhar Patil and contributors
 # For license information, please see license.txt
+
+#Last Modified: 04-03-2025
+
 import json
 import frappe
 from frappe.model.document import Document
@@ -411,14 +414,14 @@ def send_whatsapp_with_pdf_v1(doc,recipients):
 		link = frappe.utils.get_url().replace(":443","") + '/files' + nome_docagt[nome_docagt.rfind('/'):]
 	else:
 		link = nome_docagt
-    
+    #FIX 04-03-2025; Check if SI or Quotation
 	payload = {
         'messaging_product': 'whatsapp', 
         'to': recipients, 
         'type': 'document', 
         'document': {
             'link': link, #'https://tl.angolaerp.co.ao/files/PP-25-2337bb43.pdf', 
-            'caption': 'Factura de Venda: {0}'.format(doc1['doc_agt']) 
+            'caption': 'Factura de Venda: {0}'.format(doc1['doc_agt']) if doc1['doctype'] == "Sales Invoice" else 'Factura Proforma: {0}'.format(doc1['doc_agt'])
         }
     }    
 	request_body = {
