@@ -8,6 +8,7 @@ from frappe.integrations.utils import make_post_request
 from frappe.desk.form.utils import get_pdf_link
 from frappe.utils import add_to_date, nowdate, datetime
 
+#Last Modified: 08-03-2025
 
 class WhatsAppNotification(Document):
     """Notification."""
@@ -103,7 +104,17 @@ class WhatsAppNotification(Document):
             if self.fields:
                 parameters = []
                 for field in self.fields:
-                    value = doc_data[field.field_name]
+                    #FIX 08-03-2025; Check if URL request
+                    if doc_data[field.field_name] == "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
+                        print ('Naming series ', doc_data['naming_series'])
+                        if doc_data['naming_series'].startswith('PP '):
+                            value = frappe.utils.get_url_to_form("Quotation", doc_data['name'])
+                        elif doc_data['naming_series'].startswith('FT ') or doc_data['naming_series'].startswith('FR '):
+                            #Assuming is Sales Invoice
+                            value = frappe.utils.get_url_to_form("Sales Invoice", doc_data['name'])
+                    else:
+                        value = doc_data[field.field_name]
+
                     if isinstance(doc_data[field.field_name], (datetime.date, datetime.datetime)):
                         value = str(doc_data[field.field_name])
                     parameters.append({
