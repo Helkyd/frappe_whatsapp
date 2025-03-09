@@ -105,8 +105,11 @@ class WhatsAppNotification(Document):
                 parameters = []
                 for field in self.fields:
                     #FIX 08-03-2025; Check if URL request
-                    if doc_data[field.field_name] == "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
+                    print ('field ', field.field_name)
+                    print ('Naming series ', doc_data['naming_series'])
+                    if field.field_name == "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
                         print ('Naming series ', doc_data['naming_series'])
+                        print ('doc name ', doc_data['name'])
                         if doc_data['naming_series'].startswith('PP '):
                             value = frappe.utils.get_url_to_form("Quotation", doc_data['name'])
                         elif doc_data['naming_series'].startswith('FT ') or doc_data['naming_series'].startswith('FR '):
@@ -115,8 +118,10 @@ class WhatsAppNotification(Document):
                     else:
                         value = doc_data[field.field_name]
 
-                    if isinstance(doc_data[field.field_name], (datetime.date, datetime.datetime)):
-                        value = str(doc_data[field.field_name])
+                    #FIX 09-03-2025
+                    if field.field_name != "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
+                        if isinstance(doc_data[field.field_name], (datetime.date, datetime.datetime)):
+                            value = str(doc_data[field.field_name])
                     parameters.append({
                         "type": "text",
                         "text": value
