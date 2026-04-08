@@ -2,13 +2,18 @@
 
 import json
 import frappe
+
+from frappe import _dict, _
 from frappe.model.document import Document
 from frappe.utils.safe_exec import get_safe_globals, safe_exec
 from frappe.integrations.utils import make_post_request
 from frappe.desk.form.utils import get_pdf_link
 from frappe.utils import add_to_date, nowdate, datetime
+from frappe_whatsapp.utils import get_whatsapp_account
 
 #Last Modified: 08-03-2025
+
+
 
 class WhatsAppNotification(Document):
     """Notification."""
@@ -23,73 +28,91 @@ class WhatsAppNotification(Document):
                 fields=["fieldname"]
             )
             if not any(field.fieldname == self.field_name for field in fields): # noqa
-                frappe.throw(f"Field name {self.field_name} does not exists")
+                frappe.throw(_("Field name {0} does not exists").format(self.field_name))
         if self.custom_attachment:
             if not self.attach and not self.attach_from_field:
-                frappe.throw("Either <b>Attach</b> a file or add a <b>Attach from field</b> to send attachemt")
+                frappe.throw(_("Either {0} a file or add a {1} to send attachemt").format(
+                    frappe.bold(_("Attach")),
+                    frappe.bold(_("Attach from field")),
+                ))
+
+        if self.set_property_after_alert:
+            meta = frappe.get_meta(self.reference_doctype)
+            if not meta.get_field(self.set_property_after_alert):
+                frappe.throw(_("Field {0} not found on DocType {1}").format(
+                    self.set_property_after_alert,
+                    self.reference_doctype,
+                ))
+
 
     def send_scheduled_message(self) -> dict:
         """Specific to API endpoint Server Scripts."""
         safe_exec(
             self.condition, get_safe_globals(), dict(doc=self)
         )
-        language_code = frappe.db.get_value(
-            "WhatsApp Templates", self.template,
-            fieldname='language_code'
-        )
-        template_actual_name = frappe.db.get_value(
-            "WhatsApp Templates", self.template,
-            fieldname='actual_name'
-        )
-        if language_code:
-            print ('CONTACT LIST')
-            print (self._contact_list)
-            for contact in self._contact_list:
-                data = {
-                    "messaging_product": "whatsapp",
-                    "to": self.format_number(contact),
-                    "type": "template",
-                    "template": {
-                        "name": template_actual_name,
-                        "language": {
-                            "code": language_code
-                        },
-                        "components": []
-                    }
-                }
-                self.content_type = template.get("header_type", "text").lower()
-                self.notify(data)
-        # return _globals.frappe.flags
-
-    def send_template_message(self, doc: Document):
-        """Specific to Document Event triggered Server Scripts."""
-        if self.disabled:
-            return
-
-        doc_data = doc.as_dict()
-        if self.condition:
-            # check if condition satisfies
-            if not frappe.safe_eval(
-                self.condition, get_safe_globals(), dict(doc=doc_data)
-            ):
-                return
 
         template = frappe.db.get_value(
             "WhatsApp Templates", self.template,
             fieldname='*'
         )
 
-        print ('field name ', self.field_name)
-        print ('docdata field_name', doc_data[self.field_name])
-        print ('DATA DOC ***********')
-        print (doc_data)
-        print ('sefl fields')
-        print (self.fields)
-        #FIX 16-02-2025
-        if template and doc_data[self.field_name] != None:
+        if template and template.language_code:
+            if self.get("_contact_list"):
+                # send simple template without a doc to get field data.
+                self.send_simple_template(template)
+            elif self.get("_data_list"):
+                # allow send a dynamic template using schedule event config
+                # _doc_list shoud be [{"name": "xxx", "phone_no": "123"}]
+                for data in self._data_list:
+                    doc = frappe.get_doc(self.reference_doctype, data.get("name"))
+
+                    self.send_template_message(doc, data.get("phone_no"), template, True)
+        # return _globals.frappe.flags
+
+
+    def send_simple_template(self, template):
+        """ send simple template without a doc to get field data """
+        for contact in self._contact_list:
             data = {
                 "messaging_product": "whatsapp",
-                "to": self.format_number(doc_data[self.field_name]),
+                "to": self.format_number(contact),
+                "type": "template",
+                "template": {
+                    "name": template.actual_name,
+                    "language": {
+                        "code": template.language_code
+                    },
+                    "components": []
+                }
+            }
+            self.content_type = template.get("header_type", "text").lower()
+            self.notify(data)
+
+
+    def send_template_message(self, doc: Document, phone_no=None, default_template=None, ignore_condition=False):
+        """Specific to Document Event triggered Server Scripts."""
+        if self.disabled:
+            return
+
+        doc_data = doc.as_dict()
+        if self.condition and not ignore_condition:
+            # check if condition satisfies
+            if not frappe.safe_eval(
+                self.condition, get_safe_globals(), dict(doc=doc_data)
+            ):
+                return
+
+        template = default_template or frappe.get_doc("WhatsApp Templates", self.template)
+
+        if template:
+            if self.field_name:
+                phone_number = phone_no or doc_data[self.field_name]
+            else:
+                phone_number = phone_no
+
+            data = {
+                "messaging_product": "whatsapp",
+                "to": self.format_number(phone_number),
                 "type": "template",
                 "template": {
                     "name": template.actual_name,
@@ -104,24 +127,14 @@ class WhatsAppNotification(Document):
             if self.fields:
                 parameters = []
                 for field in self.fields:
-                    #FIX 08-03-2025; Check if URL request
-                    print ('field ', field.field_name)
-                    print ('Naming series ', doc_data['naming_series'])
-                    if field.field_name == "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
-                        print ('Naming series ', doc_data['naming_series'])
-                        print ('doc name ', doc_data['name'])
-                        if doc_data['naming_series'].startswith('PP '):
-                            value = frappe.utils.get_url_to_form("Quotation", doc_data['name'])
-                        elif doc_data['naming_series'].startswith('FT ') or doc_data['naming_series'].startswith('FR '):
-                            #Assuming is Sales Invoice
-                            value = frappe.utils.get_url_to_form("Sales Invoice", doc_data['name'])
-                    else:
+                    if isinstance(doc, Document):
+                        # get field with prettier value.
+                        value = doc.get_formatted(field.field_name)
+                    else: 
                         value = doc_data[field.field_name]
-
-                    #FIX 09-03-2025
-                    if field.field_name != "frappe.utils.get_url_to_form(doc.doctype, doc.name)":
                         if isinstance(doc_data[field.field_name], (datetime.date, datetime.datetime)):
                             value = str(doc_data[field.field_name])
+
                     parameters.append({
                         "type": "text",
                         "text": value
@@ -133,9 +146,7 @@ class WhatsAppNotification(Document):
                 }]
 
             if self.attach_document_print:
-                # frappe.db.begin()
                 key = doc.get_document_share_key()  # noqa
-                frappe.db.commit()
                 print_format = "Standard"
                 doctype = frappe.get_doc("DocType", doc_data['doctype'])
                 if doctype.custom:
@@ -198,16 +209,58 @@ class WhatsAppNotification(Document):
                         }
                     }]
                 })
-            self.content_type = template.header_type.lower()
+            self.content_type = template.header_type.lower() if template.header_type else None
 
-            self.notify(data)
+            if template.buttons:
+                button_fields = self.button_fields.split(",") if self.button_fields else []
+                for idx, btn in enumerate(template.buttons):
+                    if btn.button_type == "Visit Website" and btn.url_type == "Dynamic":
+                        if button_fields:
+                            data['template']['components'].append({
+                                "type": "button",
+                                "sub_type": "url",
+                                "index": str(idx),
+                                "parameters": [
+                                    {"type": "text", "text": doc.get(button_fields.pop(0))}
+                                ]
+                            })
+                    elif btn.button_type == "Multi-Product Message":
+                        # MPM requires a catalog_id and product_retailer_ids
+                        if button_fields:
+                            data['template']['components'].append({
+                                "type": "button",
+                                "sub_type": "mpm",
+                                "index": str(idx),
+                                "parameters": [
+                                    {"type": "action", "action": doc.get(button_fields.pop(0))}
+                                ]
+                            })
+                    elif btn.button_type == "Catalog":
+                        if button_fields:
+                            data['template']['components'].append({
+                                "type": "button",
+                                "sub_type": "catalog",
+                                "index": str(idx),
+                                "parameters": [
+                                    {"type": "action", "action": doc.get(button_fields.pop(0))}
+                                ]
+                            })
 
-    def notify(self, data):
+
+            self.notify(data, doc_data)
+
+    def notify(self, data, doc_data=None):
         """Notify."""
-        settings = frappe.get_doc(
-            "WhatsApp Settings", "WhatsApp Settings",
-        )
-        token = settings.get_password("token")
+        # Use notification WhatsApp account if available, otherwise use a default outgoing account
+        if self.whatsapp_account:
+            whatsapp_account = frappe.get_doc("WhatsApp Account", self.whatsapp_account)
+        else:
+            whatsapp_account = get_whatsapp_account(account_type='outgoing')
+
+        if not whatsapp_account:
+            frappe.throw(_("Please set a default outgoing WhatsApp Account"))
+
+        token = whatsapp_account.get_password("token")
 
         headers = {
             "authorization": f"Bearer {token}",
@@ -216,22 +269,51 @@ class WhatsAppNotification(Document):
         try:
             success = False
             response = make_post_request(
-                f"{settings.url}/{settings.version}/{settings.phone_id}/messages",
+                f"{whatsapp_account.url}/{whatsapp_account.version}/{whatsapp_account.phone_id}/messages",
                 headers=headers, data=json.dumps(data)
             )
 
             if not self.get("content_type"):
                 self.content_type = 'text'
 
-            frappe.get_doc({
+            parameters = None
+            if data["template"]["components"]:
+                parameters = [param["text"] for param in data["template"]["components"][0]["parameters"]]
+                parameters = frappe.json.dumps(parameters, default=str)
+
+            new_doc = {
                 "doctype": "WhatsApp Message",
                 "type": "Outgoing",
                 "message": str(data['template']),
                 "to": data['to'],
                 "message_type": "Template",
                 "message_id": response['messages'][0]['id'],
-                "content_type": self.content_type
-            }).save(ignore_permissions=True)
+                "content_type": self.content_type,
+                "use_template": 1,
+                "template": self.template,
+                "template_parameters": parameters,
+                "whatsapp_account": whatsapp_account.name,
+            }
+
+            if doc_data:
+                new_doc.update({
+                    "reference_doctype": doc_data.doctype,
+                    "reference_name": doc_data.name,
+                })
+
+            frappe.get_doc(new_doc).save(ignore_permissions=True)
+
+            if doc_data and self.set_property_after_alert and self.property_value:
+                if doc_data.doctype and doc_data.name:
+                    fieldname = self.set_property_after_alert
+                    value = self.property_value
+                    meta = frappe.get_meta(doc_data.get("doctype"))
+                    df = meta.get_field(fieldname)
+                    if df:
+                        if df.fieldtype in frappe.model.numeric_fieldtypes:
+                            value = frappe.utils.cint(value)
+
+                        frappe.db.set_value(doc_data.get("doctype"), doc_data.get("name"), fieldname, value)
 
             frappe.msgprint("WhatsApp Message Triggered", indicator="green", alert=True)
             success = True
@@ -239,8 +321,9 @@ class WhatsAppNotification(Document):
         except Exception as e:
             error_message = str(e)
             if frappe.flags.integration_request:
-                response = frappe.flags.integration_request.json()['error']
-                error_message = response.get('Error', response.get("message"))
+                response = frappe.flags.integration_request.json().get('error', {})
+                if response:
+                    error_message = response.get('Error', response.get("message"))
 
             frappe.msgprint(
                 f"Failed to trigger whatsapp message: {error_message}",
@@ -258,6 +341,7 @@ class WhatsAppNotification(Document):
                 "meta_data": meta
             }).insert(ignore_permissions=True)
 
+
     def on_trash(self):
         """On delete remove from schedule."""
         frappe.cache().delete_value("whatsapp_notification_map")
@@ -274,13 +358,14 @@ class WhatsAppNotification(Document):
 
         print ('Number ', number)
 
+        if not number:
+            return number
         if (number.startswith("+")):
             number = number[1:len(number)]
         elif indicativo:
             number = "244" + str(number)
 
         return number
-
 
     def get_documents_for_today(self):
         """get list of documents that will be triggered today"""
